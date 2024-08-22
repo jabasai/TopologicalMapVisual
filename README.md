@@ -2,6 +2,10 @@
 
 This extension allows you to visualize your topological map wihtin the VS Code instead of downloading and setting up ROS and RViZ. 
 
+## Setup
+
+This extension is available publically via VSCode Marketplace. Search for 'Topological Map Visual'
+
 ## Features
 
 Basic usage: 
