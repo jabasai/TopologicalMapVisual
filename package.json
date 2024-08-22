@@ -5,6 +5,7 @@
   "version": "0.0.1",
   "icon": "media/icon.png",
   "publisher": "ArshadKhan", 
+  "repository": {},
   "engines": {
     "vscode": "^1.92.0"
   },
