@@ -13,10 +13,8 @@ function activate(context) {
             if (path.extname(filePath) === '.yaml' || path.extname(filePath) === '.yml') {
                 const fileContent = document.getText();
                 const data = yaml.load(fileContent);
-
 				if ( data.nodes !== undefined ){
-					const lib_path = vscode.Uri.joinPath(context.extensionUri, 'cytoscape.min.js');
-					handle_visuslize_graph(lib_path, data);
+					handle_visuslize_graph(context, data);
 				} else {
 					vscode.window.showErrorMessage('Please open a valid YAML file containing topological map.');
 				}
@@ -29,7 +27,8 @@ function activate(context) {
     context.subscriptions.push(disposable);
 }
 
-function handle_visuslize_graph(lib_path, data) {
+
+function handle_visuslize_graph(context, data) {
     const panel = vscode.window.createWebviewPanel(
         'graphVisualization', 
         'Topological Map Visualization', 
@@ -37,9 +36,26 @@ function handle_visuslize_graph(lib_path, data) {
         {enableScripts: true,}
     );
 
-	const lib_uri = panel.webview.asWebviewUri(lib_path);
-    const graphData = handle_convert_yaml_to_topomap(data);
-    panel.webview.html = handle_generate_webview(lib_uri, graphData);
+	const uris = handle_different_paths(context, panel)
+    const graph_data = handle_convert_yaml_to_topomap(data);
+    panel.webview.html = handle_generate_webview(uris, graph_data);
+}
+
+// webview uris
+function handle_different_paths(context, panel){
+
+	const uris = { 
+		cytoscape : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri, 'src/cytoscape.min.js') ),
+
+		bootstrap_js : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/bootstrap.min.js') ),
+		bootstrap_css : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/bootstrap.min.css') ),
+		bootstrap_theme : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/bootstrap-theme.min.css') ),
+
+		app_js : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/index.js') ),
+		app_css : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/style.css') ),
+	}
+
+	return uris
 }
 
 function handle_convert_yaml_to_topomap(data) {
@@ -50,8 +66,8 @@ function handle_convert_yaml_to_topomap(data) {
 	graph_data = data.nodes.map( (node, index) => {
 		const { x, y, z } = node.node.pose.position 
 		return { 
-			data :  {id : node.meta.node, },
-			position : { x : -1*x, y }
+			data :  {id : node.meta.node, node : node },
+			position : { x, y }
 		}
 	})
 
@@ -62,7 +78,9 @@ function handle_convert_yaml_to_topomap(data) {
 			graph_data.push( { data : {
 				id : edge.edge_id, 
 				source : node.meta.node,
-				target : edge.node
+				target : edge.node, 
+				edge : edge ,
+				weight: 1,
 			} } )
 		}
 	}
@@ -70,78 +88,54 @@ function handle_convert_yaml_to_topomap(data) {
     return graph_data;
 }
 
-function handle_generate_webview(lib_uri, graphData) {
+function handle_generate_webview(uris, graph_data) {
 
 	return `<!DOCTYPE html>
     <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Graph</title>
-	    <script src="${lib_uri}"></script>
-	</head>
-    <body>
-		<div id="instructions"> 
-			Use your mouse to zoom in and out or pan the graph.
-		</div>
-        <div id="cy" style="width: 100%; height: 100%;"></div>
-        <script>
-            var cy = cytoscape({
-				container: document.getElementById('cy'),
-				elements: ${JSON.stringify(graphData)},
-				style: [
-					{
-						selector: 'node',
-						style: {
-							'background-color': '#666',
-							'label': 'data(id)',
-							'font-size' : 0.25,
-							'height' : 0.25, 
-							'width' : 0.25
-						}
-					},
-					{
-						selector: 'edge',
-						style: {
-							'width': 0.15,
-							'line-color': '#ccc',
-							'target-arrow-color': '#ccc',
-							'target-arrow-shape': 'triangle'
-						}
-					}
-				],
-				layout: {
-					name: 'preset'  
-				}
-			});
-			cy.center()
+		<head>
+			<meta charset="UTF-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<title>Graph Visualization</title>
 
-        </script>
-		<style>
-			#instructions { 
-				width : 10%;
-				height : 5%;
-				position: absolute;
-				top  : 0px;
-				right : 40px ; 
-				font-size: 12px;
 
-				background: rgba(255, 255, 255, 0.2);
-				backdrop-filter: blur(5px);
-				-webkit-backdrop-filter: blur(5px);
-				border: 1px solid rgba(255, 255, 255, 0.3);
-			}
+			<script src="${uris['cytoscape']}"></script>
 
-			#cy {
-				width: 100%;
-				height: 100%;
-				position: absolute; 
-				top: 0px;
-				left: 0px;
-			}
-		</style>
+			<script src="${uris['bootstrap_js']}"></script>
+			<link rel="stylesheet" href="${uris['bootstrap_css']}"/>
 
-    </body>
+			<script src="${uris['app_js']}"></script>
+			<link rel="stylesheet" href="${uris['app_css']}"/>
+		</head>
+		<body>
+			<div id="side-bar"> 
+
+				<input type="checkbox" id="lock" name="lock" >
+				<label for="lock"> Lock View</label>
+
+				<input type="checkbox" id="edit" name="edit" >
+				<label for="edit"> Edit Graph</label>
+				<br>
+
+				<label for="source">Source node:</label>
+				<select name="source" id="source">
+				</select>
+				<br>
+
+				<label for="target">Target node:</label>
+				<select name="target" id="target">
+				</select>
+				<br>
+
+				<button id="find-path"> Find Path </button>
+				<button id="clear-path"> Clear Path </button>
+					
+			</div>
+			<div id="cy" style="width: 100%; height: 100%;"></div>
+
+			<script>
+				graph_handler.plot_graph(${JSON.stringify(graph_data)})
+			</script>
+		</body>
     </html>`;
 }
 

@@ -7,3 +7,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
+
+
+## v0.0.2
+
+- A more structured extension. 
+- Added option to lock view-port and edit graph.
+- Added option for A-star algorithm with visualization. 
