@@ -39,6 +39,17 @@
     margin : 5px; 
     padding : 5px;
     border: 2px white solid;
+    
+}
+
+.sidebar-sub-container-1 { 
+    display: grid;
+    grid-template-columns: max-content 1fr; 
+    gap: 10px;  
+    max-width: 400px;  
+    margin : 5px; 
+    padding : 5px;
+    border: 2px white solid;
 }
 
 .node-modal { 
@@ -50,4 +61,21 @@
     margin: 5px;
     padding: 10px;
     z-index: 100;
+}
+
+
+.form-group {
+    display: contents; /* Allows label and input to behave as individual grid items */
+}
+
+.form-group label {
+    justify-self: start;
+    margin-right: 10px; /* Optional: spacing between label and input */
+}
+
+.form-group input {
+    justify-self: stretch; /* Make the input take up available space */
+    max-width: 250px; /* Limit the input field width */
+    padding: 2px; /* Add padding for better appearance */
+    box-sizing: border-box; /* Ensures padding doesn't exceed max width */
 }

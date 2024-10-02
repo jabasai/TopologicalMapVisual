@@ -41,7 +41,29 @@ function handle_visuslize_graph(context, data) {
 
 	const uris = handle_different_paths(context, panel)
     const graph_data = handle_convert_yaml_to_topomap(data);
-    panel.webview.html = handle_generate_webview(uris, graph_data);
+	const other_data = { meta : data.meta, metric_map : data.metric_map, name : data.name, pointset : data.pointset, transformation : data.transformation }
+    panel.webview.html = handle_generate_webview(uris, graph_data, other_data);
+
+	panel.webview.onDidReceiveMessage( 
+		async message => {
+			if (message.command === "select_folder" ){
+				const uri = await vscode.window.showOpenDialog({
+					canSelectFolders: true,
+					canSelectFiles: false,
+					canSelectMany: false
+				});
+
+				if (uri && uri[0]) {
+					const fn = message.fn 
+					const content = message.content 
+					const folderUri = uri[0].fsPath
+					const filePath = path.join(folderUri, fn);
+					fs.writeFileSync(filePath, content);
+					vscode.window.showInformationMessage('File saved successfully in ' + filePath);
+				}
+			}
+		}
+	)
 }
 
 // webview uris
@@ -53,6 +75,9 @@ function handle_different_paths(context, panel){
 		bootstrap_js : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/bootstrap.min.js') ),
 		bootstrap_css : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/bootstrap.min.css') ),
 		bootstrap_theme : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/bootstrap-theme.min.css') ),
+
+		jsyaml_js : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'node_modules/js-yaml/dist/js-yaml.min.js') ),
+
 
 		app_js : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/index.js') ),
 		app_css : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/style.css') ),
@@ -138,7 +163,7 @@ function handle_convert_yaml_to_topomap(data) {
     return graph_data;
 }
 
-function handle_generate_webview(uris, graph_data) {
+function handle_generate_webview(uris, graph_data, other_data) {
 
 	return `<!DOCTYPE html>
     <html lang="en">
@@ -149,7 +174,7 @@ function handle_generate_webview(uris, graph_data) {
 
 
 			<script src="${uris['cytoscape']}"></script>
-
+			<script src="${uris['jsyaml_js']}"></script>
 			<script src="${uris['bootstrap_js']}"></script>
 			<link rel="stylesheet" href="${uris['bootstrap_css']}"/>
 
@@ -158,6 +183,21 @@ function handle_generate_webview(uris, graph_data) {
 		</head>
 		<body>
 			<div id="side-bar"> 
+
+				<div class="sidebar-sub-container-1">
+					<div class='form-group'>
+						<label for="map-name"> Map Name </label>
+						<input type="text" id="map-name"  >
+					</div>
+					<div class='form-group'>
+						<label for="pointset-name"> Pointset Name </label>
+						<input type="text" id="pointset-name"   >
+					</div>					
+					<div class='form-group'>
+						<label for="metric-map-name"> Metric Map Name </label>
+						<input type="text" id="metric-map-name"   >
+					</div>
+				</div>
 
 
 				<div class="sidebar-sub-container">
@@ -175,13 +215,11 @@ function handle_generate_webview(uris, graph_data) {
 					<input type="checkbox" id="hide-node-names" name="hide-node-names" >
 					<label for="hide-node-names"> Hide Node Labels</label>
 					<br>
-					
-
 				</div>
 
 				<div class="sidebar-sub-container">
 					<button id="center-graph-view"> Center Graph View </button>
-					<button id="export=datum-file"> Export Topological Map </button>
+					<button id="export-graph-file"> Export Topological Map </button>
 				</div>
 
 
@@ -208,7 +246,7 @@ function handle_generate_webview(uris, graph_data) {
 			<div id="cy" style="width: 100%; height: 100%;"></div>
 
 			<script>
-				graph_handler.plot_graph(${JSON.stringify(graph_data)})
+				graph_handler.plot_graph(${JSON.stringify(graph_data)}, ${JSON.stringify(other_data)})
 			</script>
 		</body>
     </html>`;

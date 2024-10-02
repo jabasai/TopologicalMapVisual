@@ -1,3 +1,7 @@
+// const yaml = require('js-yaml');
+
+// import { yaml } from "js-yaml"
+
 const TOPOLOGICAL_NODE_COLOR = "rgba(204,204,204, 0.4)"
 const TOPOLOGICAL_EDGE_COLOR = "rgba(25,100,23,0.5)"
 const TOPOLOGICAL_VERT_NODE_COLOR = "rgba(204,204,204, 0.4)"
@@ -6,7 +10,9 @@ const TOPOLOGICAL_VERT_EDGE_COLOR = "rgba(255,0,0,1.0)"
 class GraphHandler
 {
     constructor(){
+        
         this._graph_data = null
+        this._graph_other_data = null
         this._graph = null
 
         this._source_node = null
@@ -18,11 +24,14 @@ class GraphHandler
         this._start_x = 0 
         this._start_y = 0 
         this._initial_angle = 0 
+
+        this.vscode = acquireVsCodeApi();
     }
  
-    plot_graph(graph_data){
+    plot_graph(graph_data, other_data){
 
         if ( this._graph ) { return }
+        this._graph_other_data = other_data
         this._graph = cytoscape({
             container: document.getElementById('cy'),
             elements: graph_data,
@@ -101,13 +110,46 @@ class GraphHandler
             autounselectify: false,
         });
 
-        this.handle_setup_events()
+        this.handle_setup_vscode_events()
         this.handle_dom_events_control_bar()
         this.handle_setup_dom_event_path_find()
+        this.handle_setup_events()
+    }
+
+    handle_setup_vscode_events()
+    {
+        window.addEventListener('message', event => {
+            const message = event.data;
+            if (message.command === 'selected_folder') {
+                const selected_folder = message.folderUri;
+                console.log(selected_folder)
+            }
+        });
     }
 
     handle_dom_events_control_bar()
     {
+
+        // input text 
+        const map_name = document.getElementById("map-name")
+        map_name.value = this._graph_other_data.name
+        map_name.addEventListener("input", (event)=> {
+            this._graph_other_data.name = map_name.value
+        })
+
+        const pointset_name = document.getElementById("pointset-name")
+        pointset_name.value = this._graph_other_data.pointset
+        pointset_name.addEventListener("input", (event)=> {
+            this._graph_other_data.pointset = pointset_name.value
+        })
+
+        const metric_map_name = document.getElementById("metric-map-name")
+        metric_map_name.value = this._graph_other_data.metric_map
+        metric_map_name.addEventListener("input", (event)=> {
+            this._graph_other_data.metric_map = metric_map_name.value
+        })
+
+
         const lock_screen = document.getElementById("lock")
         lock_screen.addEventListener('click', ()=>{
             this._graph.panningEnabled( !lock_screen.checked )
@@ -161,7 +203,28 @@ class GraphHandler
             this._graph?.fit()
         })
 
+        const btn_export_graph = document.getElementById("export-graph-file")
+        btn_export_graph.addEventListener("click",  async ()=>{
 
+            const fn = "data.tmap2.yaml"
+            const nodes = this._graph.nodes()
+            const datum_data = { ...this._graph_other_data, nodes : []}
+            
+            nodes.forEach( item => {
+                const node = item.data('node') 
+                const position = item.position()
+                if ( node ) { 
+                    node.node.pose.position.x = position.x 
+                    node.node.pose.position.y = position.y 
+                    datum_data.nodes.push ( node )
+                }
+
+            })
+
+            const datum_yaml_content = jsyaml.dump(datum_data, { flowLevel : 100, lineWidth : 80, noCompatMode: true});
+            this.vscode.postMessage({ command: 'select_folder' , content : datum_yaml_content , fn });
+
+        })
 
     }
 
@@ -217,7 +280,6 @@ class GraphHandler
         })
     }
 
-
     handle_setup_events()
     { 
 
@@ -236,7 +298,6 @@ class GraphHandler
             this.handle_hide_node_modal();
         });
     }
-
 
     // Function to show modal and update its content
     handle_show_node_modal(node) {
@@ -259,7 +320,6 @@ class GraphHandler
         modal.style.top = `${parseInt(node.renderedPosition().y) - 20}px`;
     }
     
-
     // node: topo-node
     handle_move_node_verts(node){
 
