@@ -2,7 +2,7 @@
   "name": "topological-map-visual",
   "displayName": "Topological Map Visual",
   "description": "A VS Code extension to easily visualize the \ttopological maps without any ROS setup. ",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "icon": "media/icon.png",
   "publisher": "ArshadKhan", 
   "repository": {},
