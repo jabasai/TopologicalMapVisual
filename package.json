@@ -2,10 +2,11 @@
   "name": "topological-map-visual",
   "displayName": "Topological Map Visual",
   "description": "A VS Code extension to easily visualize the \ttopological maps without any ROS setup. ",
-  "version": "0.0.2",
+  "version": "1.0.3",
   "icon": "media/icon.png",
   "publisher": "ArshadKhan", 
   "repository": {},
+  "license" : "MIT",
   "engines": {
     "vscode": "^1.92.0"
   },
@@ -25,7 +26,8 @@
   "scripts": {
     "lint": "eslint .",
     "pretest": "npm run lint",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "build" : "vsce package"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.7",
