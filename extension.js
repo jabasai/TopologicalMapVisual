@@ -96,8 +96,14 @@ function handle_convert_yaml_to_topomap(data) {
 		return { 
 			data :  {id : node.meta.node, node : node  },
 			position : { x, y }, 
-			classes : "topological_node"
+			classes : "topological-node"
 		}
+	})
+
+	graph_data.push({
+		data : { id : "agent" }, 
+		position : { x: data.nodes[0].node.pose.position.x, y : data.nodes[0].node.pose.position.y  } , 
+		classes : "hidden-agent"
 	})
 
 	// add the vertices 
@@ -110,7 +116,7 @@ function handle_convert_yaml_to_topomap(data) {
 			graph_data.push( { 
 				data : {id : `${node_id}_${i}`, }, 
 				position : { x :  x + vert.x, y : y + vert.y },
-				classes : "topological_vert"
+				classes : "topological-vert"
 			})
 
 			if ( i > 0 ) {
@@ -122,7 +128,7 @@ function handle_convert_yaml_to_topomap(data) {
 						target : `${node_id}_${i_prev}`,
 						weight : 1
 					}, 
-					classes : "topological_vert_edge"
+					classes : "topological-vert-edge"
 				})
 				
 				if  (i === verts.length - 1 ){
@@ -134,7 +140,7 @@ function handle_convert_yaml_to_topomap(data) {
 							target : `${node_id}_${i_prev}`,
 							weight : 1
 						}, 
-						classes : "topological_vert_edge"
+						classes : "topological-vert-edge"
 					})
 				}
 			}
@@ -155,7 +161,7 @@ function handle_convert_yaml_to_topomap(data) {
 					edge : edge ,
 					weight: 1,
 				}, 
-				classes : "topological_edge"
+				classes : "topological-edge"
 			})
 		}
 	}

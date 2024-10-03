@@ -17,8 +17,9 @@ class GraphHandler
 
         this._source_node = null
         this._target_node = null
+        this._agent_animation = null
 
-        this._a_start_result = null
+        this._a_star_result = null
 
         this._is_graph_rotating = false 
         this._start_x = 0 
@@ -37,7 +38,7 @@ class GraphHandler
             elements: graph_data,
             style: [
                 {
-                    selector: '.topological_node',
+                    selector: '.topological-node',
                     style: {
                         'background-color': TOPOLOGICAL_NODE_COLOR, //'#666',
                         'label': 'data(id)',
@@ -49,7 +50,7 @@ class GraphHandler
                     }
                 },
                 {
-                    selector: '.topological_edge',
+                    selector: '.topological-edge',
                     style: {
                         'line-color': TOPOLOGICAL_EDGE_COLOR,
                         'color' : TOPOLOGICAL_NODE_COLOR,
@@ -62,7 +63,7 @@ class GraphHandler
                     }
                 },
                 {
-                    selector: '.topological_vert',
+                    selector: '.topological-vert',
                     style: {
                         'color' : TOPOLOGICAL_VERT_NODE_COLOR,
                         'height' : 0.01, 
@@ -70,7 +71,7 @@ class GraphHandler
                     }
                 },
                 {
-                    selector: '.topological_vert_edge',
+                    selector: '.topological-vert-edge',
                     style: {
                         'line-color': TOPOLOGICAL_VERT_EDGE_COLOR,
                         'width': 0.01,
@@ -100,13 +101,36 @@ class GraphHandler
                         'width' : 0.25,
                         "z-index" : 2
                     }
+                },
+                {
+                    selector: '.visible-agent',
+                    css: {
+                        'shape': 'star',
+                        'background-color': '#00FF00',
+                        "z-index" : 5,
+                        'label': 'data(id)',
+                        'font-size' : 0.2,
+                        'color' : TOPOLOGICAL_NODE_COLOR,
+                        'height' : 0.5, 
+                        'width' : 0.5,
+                    }
+                },
+
+                {
+                    selector: '.hidden-agent',
+                    css: {
+                        'label': '',
+                        'height' : 0.0, 
+                        'width' : 0.0,
+                        'color' : "transparent",
+                    }
                 }
             ],
             layout: {
                 name: 'preset'  
             },
-            autolock: true,
-            autoungrabify: true,
+            autolock: false,
+            autoungrabify: false,
             autounselectify: false,
         });
 
@@ -120,10 +144,7 @@ class GraphHandler
     {
         window.addEventListener('message', event => {
             const message = event.data;
-            if (message.command === 'selected_folder') {
-                const selected_folder = message.folderUri;
-                console.log(selected_folder)
-            }
+            message
         });
     }
 
@@ -160,6 +181,7 @@ class GraphHandler
 
 
         const edit_graph = document.getElementById("edit")
+        edit_graph.checked = !this._graph.autolock() && !this._graph.autoungrabify()
         edit_graph.addEventListener('click', ()=>{
             this._graph.autolock( !edit_graph.checked )
             this._graph.autoungrabify( !edit_graph.checked )
@@ -206,7 +228,7 @@ class GraphHandler
         const btn_export_graph = document.getElementById("export-graph-file")
         btn_export_graph.addEventListener("click",  async ()=>{
 
-            const fn = "data.tmap2.yaml"
+            const fn = this._graph_other_data && this._graph_other_data.name ? this._graph_other_data.name : "topological_map.tmap2.yaml"
             const nodes = this._graph.nodes()
             const datum_data = { ...this._graph_other_data, nodes : []}
             
@@ -218,7 +240,6 @@ class GraphHandler
                     node.node.pose.position.y = position.y 
                     datum_data.nodes.push ( node )
                 }
-
             })
 
             const datum_yaml_content = jsyaml.dump(datum_data, { flowLevel : 100, lineWidth : 80, noCompatMode: true});
@@ -263,33 +284,82 @@ class GraphHandler
 
         const find_path_btn = document.getElementById("find-path")
         find_path_btn.addEventListener( 'click', ()=>{
+
+            if ( this._agent_animation ) { 
+                this._agent_animation.stop()
+                this._graph.$(`#agent`).addClass("hidden-agent")
+                this._graph.$(`#agent`).removeClass("visible-agent")
+            } 
+
             this._graph.nodes().removeClass("shortest-path")
-            this._a_start_result?.path?.removeClass("shortest-path")
+            this._a_star_result?.path?.removeClass("shortest-path")
 
             this._source_node = this._graph.getElementById(source_selector.value)
             this._target_node = this._graph.getElementById(target_selector.value)
-            this._a_start_result = this._graph.elements().aStar({ root: this._source_node, goal: this._target_node });
-            if ( this._a_start_result.found ) {
-                this._a_start_result.path?.addClass("shortest-path")
+            this._a_star_result = this._graph.elements().aStar({ root: this._source_node, goal: this._target_node });
+
+            if ( this._a_star_result.found ) {
+
+                this._a_star_result.path?.addClass("shortest-path")
+                const path_nodes = this._a_star_result.path.nodes().map(node => node.position());
+                const node_id = "agent"
+
+                const fn_animate_node_on_path = (agent_id, path, duration) => {
+                    let current_index = 0;
+                    this._graph.$(`#${agent_id}`).removeClass("hidden-agent")
+                    this._graph.$(`#${agent_id}`).addClass("visible-agent")
+                    this._graph.$(`#${agent_id}`).position( path[current_index] )
+
+                    const fn_move_to_next_node = () => {
+                        if (current_index < path.length - 1) {
+                            const start = path[current_index];
+                            const end = path[current_index + 1];
+
+                            this._agent_animation = this._graph.$(`#${agent_id}`).animate({
+                                position: end
+                            }, {
+                                duration: duration,
+                                easing: 'ease-in-out',  
+                                complete: () => {
+                                    current_index++;
+                                    fn_move_to_next_node(); 
+                                },
+                            });
+                        } else {
+                            current_index = 0;
+                            this._graph.$(`#${agent_id}`).position( path[current_index] )
+                            fn_move_to_next_node(); 
+                        }
+                    }
+
+                    fn_move_to_next_node();
+                }
+
+                fn_animate_node_on_path('agent', path_nodes, 1000); // 1000ms (1 second) per node
             }
         })
         
         const clear_path_btn = document.getElementById("clear-path")
         clear_path_btn.addEventListener( 'click', ()=>{
-            this._a_start_result?.path?.removeClass("shortest-path")
+            this._a_star_result?.path?.removeClass("shortest-path")
+            if ( this._agent_animation ) { 
+                this._agent_animation.stop()
+                this._graph.$(`#agent`).addClass("hidden-agent")
+                this._graph.$(`#agent`).removeClass("visible-agent")
+            } 
         })
     }
 
     handle_setup_events()
     { 
 
-        this._graph.on("position", ".topological_node", (event)=> {
+        this._graph.on("position", ".topological-node", (event)=> {
             const node = event.target 
             this.handle_show_node_modal(node)
             this.handle_move_node_verts(node)
         })
 
-        this._graph.on("position", ".topological_vert", (event)=> {
+        this._graph.on("position", ".topological-vert", (event)=> {
             const node = event.target 
             this.handle_update_node_vert(node)
         })
