@@ -155,19 +155,29 @@ class GraphHandler
         const map_name = document.getElementById("map-name")
         map_name.value = this._graph_other_data.name
         map_name.addEventListener("input", (event)=> {
-            this._graph_other_data.name = map_name.value
+            this._graph_other_data.name = map_name.value 
         })
 
         const pointset_name = document.getElementById("pointset-name")
         pointset_name.value = this._graph_other_data.pointset
         pointset_name.addEventListener("input", (event)=> {
             this._graph_other_data.pointset = pointset_name.value
+            this._graph.nodes().forEach( i => {
+                const node = i.data('node')
+                node.meta.pointset = pointset_name.value
+                i.data('data', node)
+            })
         })
 
         const metric_map_name = document.getElementById("metric-map-name")
         metric_map_name.value = this._graph_other_data.metric_map
         metric_map_name.addEventListener("input", (event)=> {
-            this._graph_other_data.metric_map = metric_map_name.value
+            this._graph_other_data.metric_map = metric_map_name.value 
+            this._graph.nodes().forEach( i => {
+                const node = i.data('node')
+                node.meta.map = metric_map_name.value
+                i.data('data', node)
+            })
         })
 
 
@@ -228,8 +238,20 @@ class GraphHandler
         const btn_export_graph = document.getElementById("export-graph-file")
         btn_export_graph.addEventListener("click",  async ()=>{
 
-            const fn = this._graph_other_data && this._graph_other_data.name ? this._graph_other_data.name : "topological_map.tmap2.yaml"
+            const fn = this._graph_other_data && this._graph_other_data.name ? `${this._graph_other_data.name}.tmap2.yaml` : "topological_map.tmap2.yaml"
             const nodes = this._graph.nodes()
+
+            const last_update_dt = new Date()
+            this._graph_other_data.meta.last_updated = last_update_dt.toLocaleString("en-US", { 
+                year: 'numeric', 
+                month: 'numeric',
+                day: 'numeric',  
+                hour: '2-digit', 
+                minute: '2-digit',  
+                second: '2-digit', 
+                hour12: false  
+            }).replaceAll("/", "-").replaceAll(":","-").replaceAll(", ","_")
+
             const datum_data = { ...this._graph_other_data, nodes : []}
             
             nodes.forEach( item => {
