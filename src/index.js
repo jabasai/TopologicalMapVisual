@@ -443,6 +443,8 @@ class GraphHandler {
 
     const edges = node.data("node").node.edges;
     const rotation = node.data("rotation")
+    const yaw_tolerance = node.data("node").node.properties.yaw_goal_tolerance
+    const position_tolerance = node.data("node").node.properties.xy_goal_tolerance
     const edges_html = edges
       .map((e) => {
         return `<li> ${e.edge_id} </li>`;
@@ -451,8 +453,8 @@ class GraphHandler {
 
     modal.innerHTML = `
             <b>Node ID:</b> ${node.id()} <br>
-            <b>Position:</b>  X: ${x.toFixed(4)}-m  Y: ${y.toFixed(4)}-m <br>
-            <b>Rotation (Yaw):</b>  ${rotation.toFixed(1)}° <br>
+            <b>Pose:</b> (${x.toFixed(4)}, ${y.toFixed(4)}, ${rotation.toFixed(1)}°)<br>
+            <b>Tolerances:</b> (${position_tolerance}-m, ${yaw_tolerance}°) <br>
             <b>Edges:</b><ol>${edges_html}</ol>
         `;
 
