@@ -65,13 +65,13 @@ function handle_visuslize_graph(context, data) {
 		}
 	)
 }
-
+ 
 // webview uris
 function handle_different_paths(context, panel){
 
 	const uris = { 
 		cytoscape : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri, 'src/cytoscape.min.js') ),
-
+		
 		bootstrap_js : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/bootstrap.min.js') ),
 		bootstrap_css : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/bootstrap.min.css') ),
 		bootstrap_theme : panel.webview.asWebviewUri( vscode.Uri.joinPath(context.extensionUri,  'src/bootstrap-theme.min.css') ),
@@ -86,6 +86,30 @@ function handle_different_paths(context, panel){
 	return uris
 }
 
+function handle_convert_quat_to_euler(q){
+	const w = q.w;  
+	const x = q.x; 
+	const y = q.y;  
+	const z = q.z;  
+  
+	const sinr_cosp = 2 * (w * x + y * z);
+	const cosr_cosp = 1 - 2 * (x * x + y * y);
+	const roll = Math.atan2(sinr_cosp, cosr_cosp);
+  
+	const sinp = 2 * (w * y - z * x);
+	const pitch = Math.abs(sinp) >= 1 ? Math.sign(sinp) * (Math.PI / 2) : Math.asin(sinp);
+  
+	const siny_cosp = 2 * (w * z + x * y);
+	const cosy_cosp = 1 - 2 * (y * y + z * z);
+	const yaw = Math.atan2(siny_cosp, cosy_cosp);
+  
+	return {
+	  roll: roll* 180 / Math.PI,   
+	  pitch: pitch* 180 / Math.PI,  
+	  yaw: yaw * 180 / Math.PI     
+	};
+}
+
 function handle_convert_yaml_to_topomap(data) {
 
 	// convert topomap to graphs
@@ -94,8 +118,8 @@ function handle_convert_yaml_to_topomap(data) {
 	graph_data = data.nodes.map( (node, index) => {
 		const { x, y, z } = node.node.pose.position 
 		return { 
-			data :  {id : node.meta.node, node : node  },
-			position : { x, y }, 
+			data :  {id : node.meta.node, node : node, rotation: handle_convert_quat_to_euler(node.node.pose.orientation).yaw + 90 },
+			position : { x, y  }, 
 			classes : "topological-node"
 		}
 	})
@@ -180,8 +204,10 @@ function handle_generate_webview(uris, graph_data, other_data) {
 
 
 			<script src="${uris['cytoscape']}"></script>
+			
 			<script src="${uris['jsyaml_js']}"></script>
 			<script src="${uris['bootstrap_js']}"></script>
+			
 			<link rel="stylesheet" href="${uris['bootstrap_css']}"/>
 
 			<script src="${uris['app_js']}"></script>
