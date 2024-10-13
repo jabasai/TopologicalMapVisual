@@ -31,7 +31,7 @@ class GraphHandler {
         const rotation = el.data('rotation')
         const width = 200
         const height = 200
-        const svgString = `
+        const svg_str = `
         <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 100 100">
             <g transform="rotate(${rotation}, 50, 50)">
                 <!-- Arrowhead -->
@@ -41,7 +41,7 @@ class GraphHandler {
             </g>
         </svg>
       `;
-      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg_str)}`;
     }
 
     if (this._graph) {
@@ -64,9 +64,9 @@ class GraphHandler {
             "width": 0.4, 
             'background-image': function(ele){ return  make_svg(ele) },
             "background-image-containment" : "over", 
-            'background-fit': 'cover',          // Ensure the arrow fits within the node
-            'background-width': '100%',           // Scale the background width
-            'background-height': '100%'           // Scale the background height
+            'background-fit': 'cover',           
+            'background-width': '100%',       
+            'background-height': '100%'            
           },
         },
         {
@@ -135,7 +135,6 @@ class GraphHandler {
             "width": 0.5,
           },
         },
-
         {
           selector: ".hidden-agent",
           css: {
@@ -144,7 +143,7 @@ class GraphHandler {
             width: 0.0,
             color: "transparent",
           },
-        },
+        },  
       ],
       layout: {
         name: "preset",

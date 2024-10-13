@@ -103,11 +103,14 @@ function handle_convert_quat_to_euler(q){
 	const cosy_cosp = 1 - 2 * (y * y + z * z);
 	const yaw = Math.atan2(siny_cosp, cosy_cosp);
   
-	return {
+	const angles =  {
 	  roll: roll* 180 / Math.PI,   
 	  pitch: pitch* 180 / Math.PI,  
 	  yaw: yaw * 180 / Math.PI     
 	};
+
+	console.log( angles ) 
+	return angles 
 }
 
 function handle_convert_yaml_to_topomap(data) {
@@ -124,6 +127,7 @@ function handle_convert_yaml_to_topomap(data) {
 		}
 	})
 
+	// add agent 
 	graph_data.push({
 		data : { id : "agent" }, 
 		position : { x: data.nodes[0].node.pose.position.x, y : data.nodes[0].node.pose.position.y  } , 
@@ -276,7 +280,12 @@ function handle_generate_webview(uris, graph_data, other_data) {
 
 			<div id="node-modal" class="node-modal"></div>
 			<div id="cy" style="width: 100%; height: 100%;"></div>
-
+ 
+			<svg id="xy-axis" width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+				<line x1="10" y1="10" x2="100" y2="10" stroke="black" stroke-width="5"/>
+				<line x1="10" y1="10" x2="10" y2="100" stroke="black" stroke-width="5"/>
+			</svg>
+			
 			<script>
 				graph_handler.plot_graph(${JSON.stringify(graph_data)}, ${JSON.stringify(other_data)})
 			</script>
