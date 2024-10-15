@@ -30,7 +30,6 @@ function activate(context) {
     context.subscriptions.push(disposable);
 }
 
-
 function handle_visuslize_graph(context, data) {
     const panel = vscode.window.createWebviewPanel(
         'graphVisualization', 
@@ -108,8 +107,7 @@ function handle_convert_quat_to_euler(q){
 	  pitch: pitch* 180 / Math.PI,  
 	  yaw: yaw * 180 / Math.PI     
 	};
-
-	console.log( angles ) 
+ 
 	return angles 
 }
 
@@ -253,6 +251,13 @@ function handle_generate_webview(uris, graph_data, other_data) {
 					<br>
 				</div>
 
+				<div class="sidebar-sub-container-1">
+					<div class='form-group'>
+						<label for="node-angle"> Selected Node Angles</label>
+						<input type="number" min="0" max="360" step="0.1" id="node-angle" name="node-angle" >
+					</div>
+				</div>
+
 				<div class="sidebar-sub-container">
 					<button id="center-graph-view"> Center Graph View </button>
 					<button id="export-graph-file"> Export Topological Map </button>
@@ -279,6 +284,7 @@ function handle_generate_webview(uris, graph_data, other_data) {
 			</div>
 
 			<div id="node-modal" class="node-modal"></div>
+			<div id="vert-modal" class="vert-modal"></div>
 			<div id="cy" style="width: 100%; height: 100%;"></div>
  
 			<svg id="xy-axis" width="200" height="200" xmlns="http://www.w3.org/2000/svg">

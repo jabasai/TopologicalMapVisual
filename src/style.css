@@ -33,6 +33,7 @@
     position: absolute; 
     bottom: 0px;
     left: 0px;
+    /* transform: scaleY(-1); */
 }
 
 /* XY Axis Container */
@@ -62,7 +63,18 @@
     border: 2px white solid;
 }
 
-.node-modal { 
+#node-modal { 
+    display: none; 
+    position: absolute; 
+    background: white; 
+    border-radius: 10px;
+    border: 1px solid black; 
+    margin: 5px;
+    padding: 10px;
+    z-index: 100;
+}
+
+#vert-modal { 
     display: none; 
     position: absolute; 
     background: white; 

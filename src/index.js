@@ -23,26 +23,26 @@ class GraphHandler {
 
     this.vscode = acquireVsCodeApi();
   }
+
+  make_arrow_svg(el) {
+    const rotation = el.data('rotation')
+    const width = 200
+    const height = 200
+    const svg_str = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 100 100">
+        <g transform="rotate(${rotation}, 50, 50)">
+            <!-- Arrowhead -->
+            <polygon points="50,10 90,50 50,40 10,50" style="fill:black;stroke:black;stroke-width:2"/>
+            <!-- Tail -->
+            <rect x="45" y="50" width="10" height="40" style="fill:black;stroke:black;stroke-width:2" />
+        </g>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg_str)}`;
+  }
  
   plot_graph(graph_data, other_data) {
     
-
-    const make_svg = (el)=> {
-        const rotation = el.data('rotation')
-        const width = 200
-        const height = 200
-        const svg_str = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 100 100">
-            <g transform="rotate(${rotation}, 50, 50)">
-                <!-- Arrowhead -->
-                <polygon points="50,10 90,50 50,40 10,50" style="fill:black;stroke:black;stroke-width:2"/>
-                <!-- Tail -->
-                <rect x="45" y="50" width="10" height="40" style="fill:black;stroke:black;stroke-width:2" />
-            </g>
-        </svg>
-      `;
-      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg_str)}`;
-    }
 
     if (this._graph) {
       return;
@@ -62,7 +62,7 @@ class GraphHandler {
             "color": TOPOLOGICAL_NODE_COLOR,
             "height": 0.4,
             "width": 0.4, 
-            'background-image': function(ele){ return  make_svg(ele) },
+            'background-image': (ele)=>{ return this.make_arrow_svg(ele) },
             "background-image-containment" : "over", 
             'background-fit': 'cover',           
             'background-width': '100%',       
@@ -296,6 +296,30 @@ class GraphHandler {
         fn,
       });
     });
+
+    // change node angles
+    const node_angle = document.getElementById("node-angle");
+    node_angle.value = 0
+    node_angle.addEventListener("input", (event) => {
+      const selected_nodes = this._graph?.elements('node:selected')
+      const new_angle = parseFloat(node_angle.value) 
+      // Apply new background image to each selected node
+      selected_nodes.forEach( (node) => {
+        const new_quat = this.handle_euler_to_quaternion( 0, 0, new_angle - 90 )
+        const node_data = node.data("node")
+        if ( node_data ) {
+          node_data.node.pose.orientation = new_quat 
+          node.data("rotation", new_angle )
+          node.style({
+            'background-image': (node)=>{ return this.make_arrow_svg(node) },
+            "background-image-containment" : "over", 
+            'background-fit': 'cover',           
+            'background-width': '100%',       
+            'background-height': '100%'  
+          });
+        }
+      });
+    });
   }
 
   handle_setup_dom_event_path_find() {
@@ -418,17 +442,22 @@ class GraphHandler {
   }
 
   handle_setup_events() {
-    this._graph.on("position", ".topological-node", (event) => {
+    
+    this._graph.on("position", "node", (event) => {
       const node = event.target;
-      this.handle_show_node_modal(node);
-      this.handle_move_node_verts(node);
-    });
+      if (!node) { return ; }
 
-    this._graph.on("position", ".topological-vert", (event) => {
-      const node = event.target;
-      this.handle_update_node_vert(node);
-    });
+      if ( node.classes().includes("topological-node") ){
+        this.handle_show_node_modal(node);
+        this.handle_move_node_verts(node);
+      }
 
+      if ( node.classes().includes("topological-vert") ){
+        this.handle_update_node_vert(node);
+      }
+      
+    });
+ 
     this._graph.on("dragfreeon", "node", (event) => {
       this.handle_hide_node_modal();
     });
@@ -438,6 +467,7 @@ class GraphHandler {
   handle_show_node_modal(node) {
     const { x, y } = node.position();
     const modal = document.getElementById("node-modal");
+    modal.node = true
     modal.style.display = "block";
 
     const edges = node.data("node").node.edges;
@@ -460,6 +490,45 @@ class GraphHandler {
     // Update modal position to follow the node
     modal.style.left = `${parseInt(node.renderedPosition().x) + 10}px`;
     modal.style.top = `${parseInt(node.renderedPosition().y) - 20}px`;
+  }
+
+  handle_show_vert_modal(vert_node, parent_node){
+
+    const modal = document.getElementById("node-modal");
+    // using the same modal but avoid showing the same modal 
+    // if the node details are shown.
+    if ( modal.node ) { return ; }
+    modal.style.display = "block";
+
+    // calcualte area and path length of verts 
+    let vertices = parent_node.data("node").node.verts
+    let n = vertices.length;
+    let vert_area = 0;
+    let vert_perimeter = 0;
+
+    // Loop through each vertex and apply the Shoelace formula
+    // and perimeter via Euclidean distance
+    for (let i = 0; i < n; i++) {
+      let x1 = vertices[i].x;
+      let y1 = vertices[i].y;
+      let x2 = vertices[(i + 1) % n].x; 
+      let y2 = vertices[(i + 1) % n].y;
+      
+      vert_area += (x1 * y2) - (y1 * x2);
+
+      let distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+      vert_perimeter += distance;
+    }
+
+    modal.innerHTML = `
+            <b>Node ID:</b> ${parent_node.id()} <br>
+            <b>Vertices Sides:</b> ${n} <br>
+            <b>Vertices Perimeter:</b> ${vert_perimeter.toFixed(4)} m<br>
+            <b>Vertices Area:</b> ${vert_area.toFixed(4)} m²<br>
+        `;
+    
+    modal.style.left = `${parseInt(vert_node.renderedPosition().x) + 10}px`;
+    modal.style.top = `${parseInt(vert_node.renderedPosition().y) - 20}px`;
   }
 
   // node: topo-node
@@ -500,12 +569,33 @@ class GraphHandler {
         y: child_position.y - parent_position.y,
       };
       parent_node.data("node", parent_node_data);
+      this.handle_show_vert_modal( node, parent_node )
     }
   }
 
   handle_hide_node_modal() {
     document.getElementById("node-modal").style.display = "none";
+    document.getElementById("node-modal").node = false
   }
+
+
+  handle_euler_to_quaternion (roll, pitch, yaw) {
+
+    const cy = Math.cos(yaw * 0.5);
+    const sy = Math.sin(yaw * 0.5);
+    const cp = Math.cos(pitch * 0.5);
+    const sp = Math.sin(pitch * 0.5);
+    const cr = Math.cos(roll * 0.5);
+    const sr = Math.sin(roll * 0.5);
+
+    const w = cr * cp * cy + sr * sp * sy;
+    const x = sr * cp * cy - cr * sp * sy;
+    const y = cr * sp * cy + sr * cp * sy;
+    const z = cr * cp * sy - sr * sp * cy;
+
+    return { w: w, x: x, y: y, z: z };
+  }
+
 }
 
 const graph_handler = new GraphHandler();
