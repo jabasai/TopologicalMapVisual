@@ -284,7 +284,6 @@ function handle_generate_webview(uris, graph_data, other_data) {
 			</div>
 
 			<div id="node-modal" class="node-modal"></div>
-			<div id="vert-modal" class="vert-modal"></div>
 			<div id="cy" style="width: 100%; height: 100%;"></div>
  
 			<svg id="xy-axis" width="200" height="200" xmlns="http://www.w3.org/2000/svg">
