@@ -27,8 +27,9 @@ TBD
 
 ## Release Notes
 
-### 1.0.0
+### 1.0.8
 
-Initial release of Topological Map visual. 
+1. Change the (multiple) node rotations by selecting them (Shift+LMB) and change the Selected Node Rotation 
+2. Changing the verts now shows an info modal about verts such as area covered, perimeter and sides. 
 
 
