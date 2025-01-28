@@ -461,6 +461,25 @@ class GraphHandler {
     this._graph.on("dragfreeon", "node", (event) => {
       this.handle_hide_node_modal();
     });
+
+    // // Add event listener for node click
+    this._graph.on('mousedown', 'node', (event) => {
+      const node = event.target;
+      this.change_node_orientation(node, 10);
+    });
+
+  }
+
+  // Method to change the orientation of a node
+  change_node_orientation(node, delta = 5) {
+    const currentOrientation = node.data('rotation') || 0;
+    const newOrientation = (currentOrientation + delta + 360) % 360; // Ensure positive rotation
+    node.data('rotation', newOrientation);
+
+    // Apply the new orientation to the node's style
+    node.style({
+      'transform': `rotate(${newOrientation}deg)`
+    });
   }
 
   // Function to show modal and update its content
