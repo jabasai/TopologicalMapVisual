@@ -16,10 +16,11 @@ function activate(context) {
 					) {
                 const fileContent = document.getText();
                 const data = yaml.load(fileContent);
+				console.log( data )
 				if ( data.nodes !== undefined ){
 					handle_visuslize_graph(context, data);
 				} else {
-					vscode.window.showErrorMessage('Please open a valid YAML file containing topological map.');
+					vscode.window.showErrorMessage('Please open a valid YAML file containing topological map. Test');
 				}
             } else {
                 vscode.window.showErrorMessage('Please open a YAML file to visualize.');
@@ -252,6 +253,14 @@ function handle_generate_webview(uris, graph_data, other_data) {
 				</div>
 
 				<div class="sidebar-sub-container-1">
+					<div class='form-group'>
+						<label for="node-x"> Selected Node dX</label>
+						<input type="number" id="node-x" step="0.1" name="node-x" >
+					</div>
+					<div class='form-group'>
+						<label for="node-y"> Selected Node dY</label>
+						<input type="number" id="node-y" step="0.1" name="node-y" >
+					</div>
 					<div class='form-group'>
 						<label for="node-angle"> Selected Node Angles</label>
 						<input type="number" min="0" max="360" step="0.1" id="node-angle" name="node-angle" >

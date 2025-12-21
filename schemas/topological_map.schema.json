@@ -1,0 +1,67 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "meta",
+      "metric_map",
+      "name",
+      "pointset",
+      "transformation",
+      "nodes"
+    ],
+    "properties": {
+      "meta": {
+        "type": "object",
+        "required": ["last_updated", "origin"],
+        "properties": {
+          "last_updated": { "type": "string" },
+          "origin": {
+            "type": "object",
+            "required": ["latitude", "longitude", "altitude"],
+            "properties": {
+              "latitude": { "type": "number" },
+              "longitude": { "type": "number" },
+              "altitude": { "type": "number" }
+            }
+          }
+        }
+      },
+  
+      "transformation": {
+        "type": "object",
+        "required": ["child", "parent", "rotation", "translation"]
+      },
+  
+      "nodes": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/nodeEntry" }
+      }
+    },
+  
+    "definitions": {
+      "nodeEntry": {
+        "type": "object",
+        "required": ["meta", "node"],
+        "properties": {
+          "meta": {
+            "type": "object",
+            "required": ["map", "node", "pointset", "tag"]
+          },
+          "node": { "$ref": "#/definitions/node" }
+        }
+      },
+  
+      "node": {
+        "type": "object",
+        "required": [
+          "name",
+          "parent_frame",
+          "pose",
+          "edges",
+          "properties",
+          "verts"
+        ]
+      }
+    }
+  }
+  

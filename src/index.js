@@ -297,6 +297,38 @@ class GraphHandler {
       });
     });
 
+    // change node dx
+    const node_dx = document.getElementById("node-x");
+    node_dx.value = 0.0
+    node_dx.addEventListener("change", (event) => {
+      const selected_nodes = this._graph?.elements('node:selected')
+      selected_nodes.forEach( (node) => {
+        const { x } = node.position();
+        const newX = parseFloat( x ) + parseFloat( node_dx.value );
+        if (!isNaN(newX)) {
+          node.position({ x: newX  });
+          this.handle_move_node_verts(node);  
+        }
+      });
+    });
+    
+    const node_dy = document.getElementById("node-y");
+    node_dy.value = 0.0 
+    node_dy.addEventListener("change", (event) => { 
+      // this.handle_hide_node_modal()
+      const selected_nodes = this._graph?.elements('node:selected')
+      selected_nodes.forEach( (node) => {
+        const { y } = node.position();
+        const newY = parseFloat( y ) + parseFloat( node_dy.value );
+        console.log("node position: ", y, node_dx.value, newY)
+        if (!isNaN(newY)) {
+          node.position({ y: newY  });
+          this.handle_move_node_verts(node); 
+          console.log("Move" ,y ,  newY)
+        }
+      });
+    });
+
     // change node angles
     const node_angle = document.getElementById("node-angle");
     node_angle.value = 0
@@ -320,6 +352,8 @@ class GraphHandler {
         }
       });
     });
+
+
   }
 
   handle_setup_dom_event_path_find() {
@@ -457,6 +491,20 @@ class GraphHandler {
       }
       
     });
+
+    this._graph.on("click", "node" , (event) => { 
+      const node = event.target;
+      if (!node) { return ; }
+
+      if ( node.classes().includes("topological-node") ){
+        this.handle_show_node_modal(node);
+        this.handle_move_node_verts(node);
+      }
+
+      if ( node.classes().includes("topological-vert") ){
+        this.handle_update_node_vert(node);
+      }
+    })
  
     this._graph.on("dragfreeon", "node", (event) => {
       this.handle_hide_node_modal();
@@ -464,33 +512,65 @@ class GraphHandler {
   }
 
   // Function to show modal and update its content
-  handle_show_node_modal(node) {
-    const { x, y } = node.position();
-    const modal = document.getElementById("node-modal");
-    modal.node = true
-    modal.style.display = "block";
+// Function to show modal and update its content
+handle_show_node_modal(node) {
+  const { x, y } = node.position();
+  const modal = document.getElementById("node-modal");
+  modal.node = true;
+  modal.style.display = "block";
 
-    const edges = node.data("node").node.edges;
-    const rotation = node.data("rotation")
-    const yaw_tolerance = node.data("node").node.properties.yaw_goal_tolerance
-    const position_tolerance = node.data("node").node.properties.xy_goal_tolerance
-    const edges_html = edges
-      .map((e) => {
-        return `<li> ${e.edge_id} </li>`;
-      })
-      .join(" ");
+  const edges = node.data("node").node.edges;
+  const rotation = node.data("rotation");
+  const yaw_tolerance = node.data("node").node.properties.yaw_goal_tolerance;
+  const position_tolerance = node.data("node").node.properties.xy_goal_tolerance;
+  const edges_html = edges.map(e => `<li>${e.edge_id}</li>`).join(" ");
 
-    modal.innerHTML = `
-            <b>Node ID:</b> ${node.id()} <br>
-            <b>Pose:</b> (${x.toFixed(4)}, ${y.toFixed(4)}, ${rotation.toFixed(1)}°)<br>
-            <b>Tolerances:</b> (${position_tolerance}-m, ${yaw_tolerance}°) <br>
-            <b>Edges:</b><ol>${edges_html}</ol>
-        `;
+  // Populate modal content
+  modal.innerHTML = `
+    <div>
+      <b>Node ID:</b> ${node.id()} <br>
+      <b>Pose:</b> (${x.toFixed(4)}, ${y.toFixed(4)}, ${rotation.toFixed(1)}°)<br>
+      <b>Tolerances:</b> (${position_tolerance}-m, ${yaw_tolerance}°) <br>
+      <b>Edges:</b><ol>${edges_html}</ol>
 
-    // Update modal position to follow the node
-    modal.style.left = `${parseInt(node.renderedPosition().x) + 10}px`;
-    modal.style.top = `${parseInt(node.renderedPosition().y) - 20}px`;
-  }
+      <div style="margin-top: 8px;">
+        <label>X:</label> <input id="node-pose-x" type="number" step="0.01" value="${x.toFixed(4)}" style="width:80px;">
+        <label>Y:</label> <input id="node-pose-y" type="number" step="0.01" value="${y.toFixed(4)}" style="width:80px;">
+      </div>
+
+      <div style="margin-top: 8px;">
+        <button id="apply-pos-btn">Apply</button>
+        <button id="close-modal-btn">Close</button>
+      </div>
+    </div>
+  `;
+
+  // --- Attach button handlers ---
+  const closeBtn = modal.querySelector("#close-modal-btn");
+  closeBtn.addEventListener("click", () => this.handle_hide_node_modal());
+
+  const applyBtn = modal.querySelector("#apply-pos-btn");
+  const inputX = modal.querySelector("#node-pose-x");
+  const inputY = modal.querySelector("#node-pose-y");
+
+  // When user clicks "Apply" or presses Enter in input, move node
+  const updatePosition = () => {
+    const newX = parseFloat(inputX.value);
+    const newY = parseFloat(inputY.value);
+    if (!isNaN(newX) && !isNaN(newY)) {
+      node.position({ x: newX, y: newY });
+      this.handle_move_node_verts(node); // also move any attached verts
+    }
+  };
+
+  applyBtn.addEventListener("click", updatePosition);
+  inputX.addEventListener("change", updatePosition);
+  inputY.addEventListener("change", updatePosition);
+
+  // Position modal near node
+  modal.style.left = `${parseInt(node.renderedPosition().x) + 10}px`;
+  modal.style.top = `${parseInt(node.renderedPosition().y) - 20}px`;
+}
 
   handle_show_vert_modal(vert_node, parent_node){
 
