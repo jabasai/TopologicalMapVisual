@@ -27,6 +27,10 @@ TBD
 
 ## Release Notes
 
+### 1.0.9
+1. Fix the node angle visualisation 
+2. Node angles are now properly calculated and exported.
+
 ### 1.0.8
 
 1. Change the (multiple) node rotations by selecting them (Shift+LMB) and change the Selected Node Rotation 
