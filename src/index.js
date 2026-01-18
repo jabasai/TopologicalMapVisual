@@ -275,12 +275,33 @@ class GraphHandler {
 
       const datum_data = { ...this._graph_other_data, nodes: [] };
 
+      // nodes.forEach((item) => {
+      //   const node = item.data("node");
+      //   const yaw = item.data("rotation");
+      //   const position = item.position();
+      //   if (node) {
+      //     node.node.pose.position.x = position.x;
+      //     node.node.pose.position.y = position.y;
+      //     datum_data.nodes.push(node);
+      //   }
+      // });
+
       nodes.forEach((item) => {
         const node = item.data("node");
+        const visual_yaw = item.data("rotation"); // Get the current degrees from the element
+        const corrected_yaw = visual_yaw - 90;
         const position = item.position();
+    
         if (node) {
+          // 1. Update Position
           node.node.pose.position.x = position.x;
           node.node.pose.position.y = position.y;
+    
+          // 2. MISSING STEP: Update Orientation
+          // Convert the current degree rotation back to a quaternion for the YAML
+          const new_quat = this.handle_euler_to_quaternion(0, 0, corrected_yaw);
+          node.node.pose.orientation = new_quat; 
+    
           datum_data.nodes.push(node);
         }
       });
@@ -320,11 +341,11 @@ class GraphHandler {
       selected_nodes.forEach( (node) => {
         const { y } = node.position();
         const newY = parseFloat( y ) + parseFloat( node_dy.value );
-        console.log("node position: ", y, node_dx.value, newY)
+        // console.log("node position: ", y, node_dx.value, newY)
         if (!isNaN(newY)) {
           node.position({ y: newY  });
           this.handle_move_node_verts(node); 
-          console.log("Move" ,y ,  newY)
+          // console.log("Move" ,y ,  newY)
         }
       });
     });
@@ -334,14 +355,16 @@ class GraphHandler {
     node_angle.value = 0
     node_angle.addEventListener("input", (event) => {
       const selected_nodes = this._graph?.elements('node:selected')
-      const new_angle = parseFloat(node_angle.value) 
+      const visual_yaw = parseFloat(node_angle.value) 
       // Apply new background image to each selected node
       selected_nodes.forEach( (node) => {
-        const new_quat = this.handle_euler_to_quaternion( 0, 0, new_angle - 90 )
+        // console.log("node angle: ", visual_yaw)
+        const data_yaw = visual_yaw - 90
+        const new_quat = this.handle_euler_to_quaternion( 0, 0, data_yaw  )
         const node_data = node.data("node")
         if ( node_data ) {
           node_data.node.pose.orientation = new_quat 
-          node.data("rotation", new_angle )
+          node.data("rotation", visual_yaw )
           node.style({
             'background-image': (node)=>{ return this.make_arrow_svg(node) },
             "background-image-containment" : "over", 
@@ -659,22 +682,47 @@ handle_show_node_modal(node) {
   }
 
 
-  handle_euler_to_quaternion (roll, pitch, yaw) {
+  // handle_euler_to_quaternion (roll, pitch, yaw) {
 
-    const cy = Math.cos(yaw * 0.5);
-    const sy = Math.sin(yaw * 0.5);
-    const cp = Math.cos(pitch * 0.5);
-    const sp = Math.sin(pitch * 0.5);
-    const cr = Math.cos(roll * 0.5);
-    const sr = Math.sin(roll * 0.5);
+  //   roll = roll * Math.PI / 180 
+  //   pitch = pitch * Math.PI / 180 
+  //   yaw = yaw * Math.PI / 180 
 
-    const w = cr * cp * cy + sr * sp * sy;
-    const x = sr * cp * cy - cr * sp * sy;
-    const y = cr * sp * cy + sr * cp * sy;
-    const z = cr * cp * sy - sr * sp * cy;
+  //   const cy = Math.cos(yaw * 0.5);
+  //   const sy = Math.sin(yaw * 0.5);
+  //   const cp = Math.cos(pitch * 0.5);
+  //   const sp = Math.sin(pitch * 0.5);
+  //   const cr = Math.cos(roll * 0.5);
+  //   const sr = Math.sin(roll * 0.5);
 
-    return { w: w, x: x, y: y, z: z };
-  }
+  //   const w = cr * cp * cy + sr * sp * sy;
+  //   const x = sr * cp * cy - cr * sp * sy;
+  //   const y = cr * sp * cy + sr * cp * sy;
+  //   const z = cr * cp * sy - sr * sp * cy;
+
+  //   return { w: w, x: x, y: y, z: z };
+  // }
+
+  handle_euler_to_quaternion(roll, pitch, yaw) {
+    // Convert degrees to radians
+    const r = roll * Math.PI / 180;
+    const p = pitch * Math.PI / 180;
+    const y = yaw * Math.PI / 180;
+
+    const cr = Math.cos(r * 0.5);
+    const sr = Math.sin(r * 0.5);
+    const cp = Math.cos(p * 0.5);
+    const sp = Math.sin(p * 0.5);
+    const cy = Math.cos(y * 0.5);
+    const sy = Math.sin(y * 0.5);
+
+    return {
+        w: cr * cp * cy + sr * sp * sy,
+        x: sr * cp * cy - cr * sp * sy,
+        y: cr * sp * cy + sr * cp * sy,
+        z: cr * cp * sy - sr * sp * cy
+    };
+}
 
 }
 
