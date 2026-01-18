@@ -16,7 +16,7 @@ function activate(context) {
 					) {
                 const fileContent = document.getText();
                 const data = yaml.load(fileContent);
-				console.log( data )
+				// console.log( data )
 				if ( data.nodes !== undefined ){
 					handle_visuslize_graph(context, data);
 				} else {
