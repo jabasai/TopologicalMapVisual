@@ -20,6 +20,10 @@
       {
         "command": "extension.showGraph",
         "title": "Visualize Topological Map"
+      },
+      {
+        "command": "extension.validateMap",
+        "title": "Validate Topological Map"
       }
     ]
   },

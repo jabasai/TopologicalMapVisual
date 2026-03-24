@@ -3,7 +3,265 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 
+// Output channel for validation logs
+let outputChannel;
+
+/**
+ * Validates the topological map data and identifies issues:
+ * - Orphan edges (edges that reference non-existent nodes)
+ * - Missing bidirectional edges (if A→B exists, B→A must exist)
+ * - Duplicate edges
+ * @param {Object} data - The parsed YAML topological map data
+ * @returns {Object} Validation result with all issues found
+ */
+function validateTopologicalMap(data) {
+    // Build set of valid node IDs
+    const validNodeIds = new Set();
+    for (const node of data.nodes) {
+        if (node.meta && node.meta.node) {
+            validNodeIds.add(node.meta.node);
+        }
+    }
+
+    // Build a map of all edges: "source->target" for bidirectional check
+    // Also track duplicates
+    const edgeMap = new Map(); // key: "source->target", value: array of edge_ids
+    const allEdges = [];
+    
+    for (const node of data.nodes) {
+        if (!node.node || !node.node.edges) continue;
+        
+        const sourceNodeId = node.meta?.node;
+        for (const edge of node.node.edges) {
+            const targetNodeId = edge.node;
+            const edgeKey = `${sourceNodeId}->${targetNodeId}`;
+            
+            allEdges.push({
+                edge_id: edge.edge_id,
+                source: sourceNodeId,
+                target: targetNodeId
+            });
+            
+            if (!edgeMap.has(edgeKey)) {
+                edgeMap.set(edgeKey, []);
+            }
+            edgeMap.get(edgeKey).push(edge.edge_id);
+        }
+    }
+
+    // Find orphan edges (edges referencing non-existent nodes)
+    const orphanEdges = [];
+    for (const edge of allEdges) {
+        // Check if source node exists
+        if (edge.source && !validNodeIds.has(edge.source)) {
+            orphanEdges.push({
+                edge_id: edge.edge_id,
+                source: edge.source,
+                target: edge.target,
+                reason: 'source_missing'
+            });
+        }
+        // Check if target node exists
+        else if (!validNodeIds.has(edge.target)) {
+            orphanEdges.push({
+                edge_id: edge.edge_id,
+                source: edge.source,
+                target: edge.target,
+                reason: 'target_missing'
+            });
+        }
+    }
+
+    // Find missing bidirectional edges (if A→B exists, B→A must exist)
+    const missingBidirectionalEdges = [];
+    for (const [edgeKey, edgeIds] of edgeMap) {
+        const [source, target] = edgeKey.split('->');
+        const reverseKey = `${target}->${source}`;
+        
+        // Skip if either node is missing (already caught as orphan)
+        if (!validNodeIds.has(source) || !validNodeIds.has(target)) {
+            continue;
+        }
+        
+        if (!edgeMap.has(reverseKey)) {
+            missingBidirectionalEdges.push({
+                edge_id: edgeIds[0], // Report the first edge_id
+                source: source,
+                target: target,
+                reason: 'missing_reverse'
+            });
+        }
+    }
+
+    // Find duplicate edges (same source->target appearing multiple times)
+    const duplicateEdges = [];
+    for (const [edgeKey, edgeIds] of edgeMap) {
+        if (edgeIds.length > 1) {
+            const [source, target] = edgeKey.split('->');
+            // Report all but the first as duplicates
+            for (let i = 1; i < edgeIds.length; i++) {
+                duplicateEdges.push({
+                    edge_id: edgeIds[i],
+                    source: source,
+                    target: target,
+                    reason: 'duplicate',
+                    original_edge_id: edgeIds[0]
+                });
+            }
+        }
+    }
+
+    const totalIssues = orphanEdges.length + missingBidirectionalEdges.length + duplicateEdges.length;
+
+    return {
+        isValid: totalIssues === 0,
+        validNodeIds,
+        edgeMap,
+        orphanEdges,
+        missingBidirectionalEdges,
+        duplicateEdges,
+        totalNodes: validNodeIds.size,
+        totalOrphanEdges: orphanEdges.length,
+        totalMissingBidirectional: missingBidirectionalEdges.length,
+        totalDuplicates: duplicateEdges.length,
+        totalIssues
+    };
+}
+
+/**
+ * Cleans the topological map by:
+ * - Removing orphan edges (referencing non-existent nodes)
+ * - Removing edges without a bidirectional counterpart
+ * - Removing duplicate edges
+ * @param {Object} data - The parsed YAML topological map data
+ * @param {Object} validationResult - Result from validateTopologicalMap
+ * @returns {Object} Cleaned data with issues removed
+ */
+function cleanTopologicalMap(data, validationResult) {
+    const { validNodeIds, edgeMap } = validationResult;
+    
+    // Deep clone the data to avoid mutating original
+    const cleanedData = JSON.parse(JSON.stringify(data));
+    
+    let orphanRemoved = 0;
+    let nonBidirectionalRemoved = 0;
+    let duplicatesRemoved = 0;
+
+    for (const node of cleanedData.nodes) {
+        if (!node.node || !node.node.edges) continue;
+        
+        const sourceNodeId = node.meta?.node;
+        const seenTargets = new Set(); // Track targets to remove duplicates
+        
+        const filteredEdges = [];
+        
+        for (const edge of node.node.edges) {
+            const targetNodeId = edge.node;
+            const edgeKey = `${sourceNodeId}->${targetNodeId}`;
+            const reverseKey = `${targetNodeId}->${sourceNodeId}`;
+            
+            // Check 1: Remove orphan edges (target node doesn't exist)
+            if (!validNodeIds.has(targetNodeId)) {
+                orphanRemoved++;
+                continue;
+            }
+            
+            // Check 2: Remove edges without bidirectional counterpart
+            if (!edgeMap.has(reverseKey)) {
+                nonBidirectionalRemoved++;
+                continue;
+            }
+            
+            // Check 3: Remove duplicate edges (same source->target)
+            if (seenTargets.has(targetNodeId)) {
+                duplicatesRemoved++;
+                continue;
+            }
+            
+            seenTargets.add(targetNodeId);
+            filteredEdges.push(edge);
+        }
+        
+        node.node.edges = filteredEdges;
+    }
+
+    return {
+        data: cleanedData,
+        orphanRemoved,
+        nonBidirectionalRemoved,
+        duplicatesRemoved,
+        totalRemoved: orphanRemoved + nonBidirectionalRemoved + duplicatesRemoved
+    };
+}
+
+/**
+ * Logs validation results to the output channel
+ * @param {Object} validationResult - Result from validateTopologicalMap
+ */
+function logValidationResults(validationResult) {
+    if (!outputChannel) {
+        outputChannel = vscode.window.createOutputChannel('Topological Map Validation');
+    }
+
+    outputChannel.clear();
+    outputChannel.appendLine('=== Topological Map Validation Report ===');
+    outputChannel.appendLine(`Total nodes: ${validationResult.totalNodes}`);
+    outputChannel.appendLine(`Total issues found: ${validationResult.totalIssues}`);
+    outputChannel.appendLine(`  - Orphan edges: ${validationResult.totalOrphanEdges}`);
+    outputChannel.appendLine(`  - Missing bidirectional edges: ${validationResult.totalMissingBidirectional}`);
+    outputChannel.appendLine(`  - Duplicate edges: ${validationResult.totalDuplicates}`);
+    outputChannel.appendLine('');
+
+    // Report orphan edges
+    if (validationResult.orphanEdges.length > 0) {
+        outputChannel.appendLine('Orphan Edges (edges referencing non-existent nodes):');
+        outputChannel.appendLine('-'.repeat(60));
+        for (const edge of validationResult.orphanEdges) {
+            outputChannel.appendLine(`  Edge ID: ${edge.edge_id}`);
+            outputChannel.appendLine(`    Source: ${edge.source}`);
+            outputChannel.appendLine(`    Target: ${edge.target}`);
+            outputChannel.appendLine(`    Reason: ${edge.reason === 'target_missing' ? 'Target node does not exist' : 'Source node does not exist'}`);
+            outputChannel.appendLine('');
+        }
+    }
+
+    // Report missing bidirectional edges
+    if (validationResult.missingBidirectionalEdges.length > 0) {
+        outputChannel.appendLine('Missing Bidirectional Edges (A→B exists but B→A missing):');
+        outputChannel.appendLine('-'.repeat(60));
+        for (const edge of validationResult.missingBidirectionalEdges) {
+            outputChannel.appendLine(`  Edge ID: ${edge.edge_id}`);
+            outputChannel.appendLine(`    ${edge.source} → ${edge.target} exists`);
+            outputChannel.appendLine(`    ${edge.target} → ${edge.source} is MISSING`);
+            outputChannel.appendLine('');
+        }
+    }
+
+    // Report duplicate edges
+    if (validationResult.duplicateEdges.length > 0) {
+        outputChannel.appendLine('Duplicate Edges (same source→target appearing multiple times):');
+        outputChannel.appendLine('-'.repeat(60));
+        for (const edge of validationResult.duplicateEdges) {
+            outputChannel.appendLine(`  Duplicate Edge ID: ${edge.edge_id}`);
+            outputChannel.appendLine(`    ${edge.source} → ${edge.target}`);
+            outputChannel.appendLine(`    Original Edge ID: ${edge.original_edge_id}`);
+            outputChannel.appendLine('');
+        }
+    }
+
+    if (validationResult.totalIssues === 0) {
+        outputChannel.appendLine('No issues found. Map is valid.');
+    }
+
+    outputChannel.show();
+}
+
 function activate(context) {
+    // Create output channel
+    outputChannel = vscode.window.createOutputChannel('Topological Map Validation');
+    context.subscriptions.push(outputChannel);
+
+    // Command to visualize the graph
     let disposable = vscode.commands.registerCommand('extension.showGraph', function () {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
@@ -18,9 +276,43 @@ function activate(context) {
                 const data = yaml.load(fileContent);
 				// console.log( data )
 				if ( data.nodes !== undefined ){
-					handle_visuslize_graph(context, data);
+					// Validate the topological map
+					const validationResult = validateTopologicalMap(data);
+					
+					if (!validationResult.isValid) {
+						// Clean the data by removing invalid edges
+						const cleanResult = cleanTopologicalMap(data, validationResult);
+						
+						// Build detailed message
+						const details = [];
+						if (cleanResult.orphanRemoved > 0) {
+							details.push(`${cleanResult.orphanRemoved} orphan`);
+						}
+						if (cleanResult.nonBidirectionalRemoved > 0) {
+							details.push(`${cleanResult.nonBidirectionalRemoved} non-bidirectional`);
+						}
+						if (cleanResult.duplicatesRemoved > 0) {
+							details.push(`${cleanResult.duplicatesRemoved} duplicate`);
+						}
+						
+						// Show warning to user
+						vscode.window.showWarningMessage(
+							`Removed ${cleanResult.totalRemoved} edge(s): ${details.join(', ')}.`,
+							'Show Details'
+						).then(selection => {
+							if (selection === 'Show Details') {
+								logValidationResults(validationResult);
+							}
+						});
+						
+						// Visualize with cleaned data
+						handle_visuslize_graph(context, cleanResult.data);
+					} else {
+						// Data is valid, visualize directly
+						handle_visuslize_graph(context, data);
+					}
 				} else {
-					vscode.window.showErrorMessage('Please open a valid YAML file containing topological map. Test');
+					vscode.window.showErrorMessage('Please open a valid YAML file containing topological map.');
 				}
             } else {
                 vscode.window.showErrorMessage('Please open a YAML file to visualize.');
@@ -29,6 +321,54 @@ function activate(context) {
     });
 
     context.subscriptions.push(disposable);
+
+    // Command to validate the topological map without visualization
+    let validateDisposable = vscode.commands.registerCommand('extension.validateMap', function () {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+            const document = editor.document;
+            const filePath = document.fileName;
+
+            if (path.extname(filePath) === '.yaml' || 
+                path.extname(filePath) === '.yml' || 
+                path.extname(filePath) === '.tmap2'
+            ) {
+                const fileContent = document.getText();
+                const data = yaml.load(fileContent);
+                
+                if (data.nodes !== undefined) {
+                    const validationResult = validateTopologicalMap(data);
+                    logValidationResults(validationResult);
+                    
+                    if (validationResult.isValid) {
+                        vscode.window.showInformationMessage(
+                            `Topological map is valid. ${validationResult.totalNodes} nodes found, no issues detected.`
+                        );
+                    } else {
+                        const issues = [];
+                        if (validationResult.totalOrphanEdges > 0) {
+                            issues.push(`${validationResult.totalOrphanEdges} orphan`);
+                        }
+                        if (validationResult.totalMissingBidirectional > 0) {
+                            issues.push(`${validationResult.totalMissingBidirectional} non-bidirectional`);
+                        }
+                        if (validationResult.totalDuplicates > 0) {
+                            issues.push(`${validationResult.totalDuplicates} duplicate`);
+                        }
+                        vscode.window.showWarningMessage(
+                            `Found ${validationResult.totalIssues} issue(s): ${issues.join(', ')} edge(s). See Output panel for details.`
+                        );
+                    }
+                } else {
+                    vscode.window.showErrorMessage('Please open a valid YAML file containing topological map.');
+                }
+            } else {
+                vscode.window.showErrorMessage('Please open a YAML file to validate.');
+            }
+        }
+    });
+
+    context.subscriptions.push(validateDisposable);
 }
 
 function handle_visuslize_graph(context, data) {
